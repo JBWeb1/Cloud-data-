@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cloud Data</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- Sign in / sign up -->
+  <main id="auth-view" class="auth" hidden>
+    <div class="card auth-card">
+      <h1>Cloud Data</h1>
+      <p class="muted" id="auth-subtitle">Sign in to your account</p>
+      <form id="auth-form">
+        <label id="name-field" hidden>Name <input name="name" autocomplete="name" maxlength="100"></label>
+        <label>Email <input name="email" type="email" autocomplete="email" required></label>
+        <label>Password <input name="password" type="password" autocomplete="current-password" minlength="8" required></label>
+        <p class="error" id="auth-error" role="alert"></p>
+        <button type="submit" id="auth-submit">Sign in</button>
+      </form>
+      <p class="switch"><span id="auth-switch-text">No account yet?</span>
+        <button type="button" class="link" id="auth-switch">Create one</button></p>
+    </div>
+  </main>
+
+  <!-- Signed in -->
+  <div id="app-view" hidden>
+    <header class="topbar">
+      <strong>Cloud Data</strong>
+      <nav>
+        <button class="tab active" data-tab="data">Data</button>
+        <button class="tab" data-tab="account">Account</button>
+        <button class="tab" data-tab="admin" id="admin-tab" hidden>Admin</button>
+      </nav>
+      <span class="who"><span id="who"></span> <button class="link" id="logout">Sign out</button></span>
+    </header>
+
+    <!-- Data tab -->
+    <section id="tab-data" class="layout">
+      <aside class="sidebar">
+        <h2>Collections</h2>
+        <ul id="collections" class="collections"></ul>
+        <form id="new-collection" class="inline">
+          <input name="name" placeholder="new-collection" pattern="[A-Za-z0-9_\-]{1,64}" required>
+          <button type="submit">Add</button>
+        </form>
+      </aside>
+      <div class="content">
+        <div class="content-head">
+          <h2 id="collection-title">Select a collection</h2>
+          <div class="actions" id="collection-actions" hidden>
+            <button class="secondary" id="rename-collection">Rename</button>
+            <button class="danger" id="delete-collection">Delete collection</button>
+          </div>
+        </div>
+        <div id="collection-body" hidden>
+          <form id="filter" class="inline">
+            <input name="where" placeholder='Filter, e.g. {"status":"open"}'>
+            <select name="sort">
+              <option value="created_at:desc">Newest first</option>
+              <option value="created_at:asc">Oldest first</option>
+              <option value="updated_at:desc">Recently updated</option>
+            </select>
+            <button type="submit" class="secondary">Apply</button>
+          </form>
+          <details class="card" id="new-item-box">
+            <summary>New item</summary>
+            <form id="new-item">
+              <textarea name="data" rows="5" spellcheck="false">{
+  "title": ""
+}</textarea>
+              <button type="submit">Create</button>
+            </form>
+          </details>
+          <p class="muted" id="items-count"></p>
+          <div id="items"></div>
+          <div class="pager">
+            <button class="secondary" id="prev">Previous</button>
+            <button class="secondary" id="next">Next</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Account tab -->
+    <section id="tab-account" class="page" hidden>
+      <div class="card">
+        <h2>Profile</h2>
+        <form id="profile" class="stack">
+          <label>Name <input name="name" maxlength="100"></label>
+          <label>Email <input name="email" type="email" required></label>
+          <button type="submit">Save</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Change password</h2>
+        <form id="password" class="stack">
+          <label>Current password <input name="current_password" type="password" autocomplete="current-password" required></label>
+          <label>New password <input name="new_password" type="password" autocomplete="new-password" minlength="8" required></label>
+          <button type="submit">Change password</button>
+        </form>
+        <p class="muted">Changing your password signs out your other devices.</p>
+      </div>
+
+      <div class="card">
+        <h2>API keys</h2>
+        <p class="muted">Use a key for scripts, other apps, or AI apps through MCP. Each key can be revoked on its own.</p>
+        <form id="new-key" class="inline">
+          <input name="name" placeholder="Key name, e.g. Claude Desktop" maxlength="100" required>
+          <button type="submit">Create key</button>
+        </form>
+        <div id="key-reveal" class="reveal" hidden>
+          <p><strong>Copy this key now.</strong> It will not be shown again.</p>
+          <code id="key-value"></code>
+          <p class="muted">Claude Desktop config (Settings → Developer → Edit Config):</p>
+          <pre id="mcp-snippet"></pre>
+        </div>
+        <table class="table" id="keys"></table>
+      </div>
+
+      <div class="card">
+        <h2>Signed-in devices</h2>
+        <table class="table" id="sessions"></table>
+        <button class="secondary" id="logout-others">Sign out all other devices</button>
+      </div>
+
+      <div class="card">
+        <h2>Your data</h2>
+        <button class="secondary" id="export">Download all my data (JSON)</button>
+      </div>
+
+      <div class="card danger-zone">
+        <h2>Delete account</h2>
+        <p class="muted">Permanently deletes your account and all of your data.</p>
+        <form id="delete-account" class="inline">
+          <input name="password" type="password" placeholder="Your password" required>
+          <button type="submit" class="danger">Delete my account</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Admin tab -->
+    <section id="tab-admin" class="page" hidden>
+      <div class="stats" id="stats"></div>
+      <div class="card">
+        <h2>Users</h2>
+        <table class="table" id="users"></table>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>

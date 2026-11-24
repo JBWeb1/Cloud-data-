@@ -1,73 +1,116 @@
+// The signed-in user's items and collections.
 const express = require('express');
 const store = require('../store');
+const { wrap, isPlainObject, badRequest } = require('./util');
 
-const router = express.Router();
-
-function badRequest(res, message) {
-  return res.status(400).json({ error: message });
-}
+const items = express.Router();
+const collections = express.Router();
 
 function notFound(res) {
   return res.status(404).json({ error: 'Item not found' });
 }
 
-function isPlainObject(value) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
+function validCollection(name) {
+  return typeof name === 'string' && store.COLLECTION_RE.test(name);
 }
 
-// Wraps async handlers so errors reach the error middleware.
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+const COLLECTION_HELP = 'collection names use letters, numbers, _ or -, max 64 chars';
 
-router.param('id', (req, res, next, id) => {
+items.param('id', (req, res, next, id) => {
   if (!store.UUID_RE.test(id)) return badRequest(res, 'id must be a UUID');
   next();
 });
 
-// List items, optionally filtered by collection.
-router.get('/', wrap(async (req, res) => {
-  const { collection, limit, offset } = req.query;
-  if (collection && !store.COLLECTION_RE.test(collection)) {
-    return badRequest(res, 'invalid collection name');
+// GET /api/items?collection=notes&where={"status":"open"}&sort=updated_at&order=asc&limit=20&offset=0
+items.get('/', wrap(async (req, res) => {
+  const { collection, sort, order, limit, offset } = req.query;
+  if (collection && !validCollection(collection)) return badRequest(res, COLLECTION_HELP);
+
+  let where;
+  if (req.query.where) {
+    try {
+      where = JSON.parse(req.query.where);
+    } catch {
+      return badRequest(res, 'where must be a JSON object, e.g. {"status":"open"}');
+    }
+    if (!isPlainObject(where)) return badRequest(res, 'where must be a JSON object');
   }
-  res.json(await store.listItems({ collection, limit, offset }));
+  res.json(await store.listItems(req.user.id, { collection, where, sort, order, limit, offset }));
 }));
 
-router.get('/:id', wrap(async (req, res) => {
-  const item = await store.getItem(req.params.id);
+items.get('/:id', wrap(async (req, res) => {
+  const item = await store.getItem(req.user.id, req.params.id);
   if (!item) return notFound(res);
   res.json(item);
 }));
 
-router.post('/', wrap(async (req, res) => {
+items.post('/', wrap(async (req, res) => {
   const { collection, data = {} } = req.body || {};
-  if (!collection || !store.COLLECTION_RE.test(collection)) {
-    return badRequest(res, 'collection is required (letters, numbers, _ or -, max 64 chars)');
-  }
+  if (!validCollection(collection)) return badRequest(res, `collection is required; ${COLLECTION_HELP}`);
   if (!isPlainObject(data)) return badRequest(res, 'data must be a JSON object');
-  res.status(201).json(await store.createItem(collection, data));
+  res.status(201).json(await store.createItem(req.user.id, collection, data));
+}));
+
+// Create many items at once: { "collection": "notes", "items": [ {...}, {...} ] }
+items.post('/bulk', wrap(async (req, res) => {
+  const { collection, items: list } = req.body || {};
+  if (!validCollection(collection)) return badRequest(res, `collection is required; ${COLLECTION_HELP}`);
+  if (!Array.isArray(list) || list.length === 0 || list.length > store.MAX_BULK) {
+    return badRequest(res, `items must be an array of 1 to ${store.MAX_BULK} JSON objects`);
+  }
+  if (!list.every(isPlainObject)) return badRequest(res, 'every entry in items must be a JSON object');
+  const created = await store.createItems(req.user.id, collection, list);
+  res.status(201).json({ created: created.length, items: created });
 }));
 
 // Replace an item's data entirely.
-router.put('/:id', wrap(async (req, res) => {
+items.put('/:id', wrap(async (req, res) => {
   const { data } = req.body || {};
   if (!isPlainObject(data)) return badRequest(res, 'data must be a JSON object');
-  const item = await store.replaceItem(req.params.id, data);
+  const item = await store.replaceItem(req.user.id, req.params.id, data);
   if (!item) return notFound(res);
   res.json(item);
 }));
 
 // Merge fields into an item's existing data.
-router.patch('/:id', wrap(async (req, res) => {
+items.patch('/:id', wrap(async (req, res) => {
   const { data } = req.body || {};
   if (!isPlainObject(data)) return badRequest(res, 'data must be a JSON object');
-  const item = await store.mergeItem(req.params.id, data);
+  const item = await store.mergeItem(req.user.id, req.params.id, data);
   if (!item) return notFound(res);
   res.json(item);
 }));
 
-router.delete('/:id', wrap(async (req, res) => {
-  if (!(await store.deleteItem(req.params.id))) return notFound(res);
+items.delete('/:id', wrap(async (req, res) => {
+  if (!(await store.deleteItem(req.user.id, req.params.id))) return notFound(res);
   res.status(204).end();
 }));
 
-module.exports = router;
+// --- collections ---
+
+collections.param('name', (req, res, next, name) => {
+  if (!validCollection(name)) return badRequest(res, COLLECTION_HELP);
+  next();
+});
+
+collections.get('/', wrap(async (req, res) => {
+  res.json(await store.listCollections(req.user.id));
+}));
+
+// Rename: { "name": "new-name" }
+collections.patch('/:name', wrap(async (req, res) => {
+  const to = req.body?.name;
+  if (!validCollection(to)) return badRequest(res, `name is required; ${COLLECTION_HELP}`);
+  const moved = await store.renameCollection(req.user.id, req.params.name, to);
+  if (!moved) return res.status(404).json({ error: 'Collection not found' });
+  res.json({ collection: to, count: moved });
+}));
+
+// Deletes every item in the collection.
+collections.delete('/:name', wrap(async (req, res) => {
+  const deleted = await store.deleteCollection(req.user.id, req.params.name);
+  if (!deleted) return res.status(404).json({ error: 'Collection not found' });
+  res.json({ deleted });
+}));
+
+module.exports = { items, collections };

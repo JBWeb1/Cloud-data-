@@ -1,15 +1,14 @@
 {
   "name": "cloud-data-server",
-  "version": "1.0.0",
-  "description": "Cloud REST API server backed by a PostgreSQL database",
+  "version": "2.0.0",
+  "description": "Cloud data server with user accounts, REST API, MCP endpoint and web dashboard, backed by PostgreSQL",
   "main": "src/index.js",
   "type": "commonjs",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "migrate": "node src/migrate.js",
-    "test": "node --test test/*.test.js",
-    "gen-key": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
+    "test": "node --test test/*.test.js"
   },
   "engines": {
     "node": ">=18"
@@ -20,6 +19,7 @@
     "cors": "^2.8.6",
     "dotenv": "^18.0.10",
     "express": "^4.22.3",
+    "express-rate-limit": "^8.7.5",
     "helmet": "^8.3.0",
     "pg": "^8.23.1",
     "zod": "^4.6.7"
