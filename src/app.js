@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const config = require('./config');
 const db = require('./db');
 const itemsRouter = require('./routes/items');
+const { createMcpRouter } = require('./mcp');
 
 function requireApiKey(req, res, next) {
   if (!config.apiKey) return next();
@@ -32,6 +33,10 @@ function createApp() {
   });
 
   app.use('/api/items', requireApiKey, itemsRouter);
+
+  if (config.mcpKey) {
+    app.use('/mcp', createMcpRouter());
+  }
 
   app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 

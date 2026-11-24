@@ -15,5 +15,7 @@ module.exports = {
   databaseSsl: process.env.DATABASE_SSL === 'true',
   // When set, every /api request must send this value in the `x-api-key` header.
   apiKey: process.env.API_KEY || null,
+  // Separate key for the MCP endpoint (/mcp). When unset, /mcp is turned off.
+  mcpKey: process.env.MCP_KEY || null,
   corsOrigin: process.env.CORS_ORIGIN || '*',
 };
