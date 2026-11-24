@@ -75,11 +75,17 @@ async function createItem(ownerId, collection, data) {
   return rows[0];
 }
 
-/** Inserts many items into one collection in a single statement. */
+/**
+ * Inserts many items into one collection in a single statement.
+ * clock_timestamp() gives each row its own, increasing time so sorting
+ * by created_at keeps the order the items were sent in.
+ */
 async function createItems(ownerId, collection, dataList) {
   const { rows } = await db.query(
-    `INSERT INTO items (owner_id, collection, data)
-     SELECT $1, $2, d FROM jsonb_array_elements($3::jsonb) AS d
+    `INSERT INTO items (owner_id, collection, data, created_at, updated_at)
+     SELECT $1, $2, e.d, clock_timestamp(), clock_timestamp()
+     FROM jsonb_array_elements($3::jsonb) WITH ORDINALITY AS e(d, n)
+     ORDER BY e.n
      RETURNING ${FIELDS}`,
     [ownerId, collection, JSON.stringify(dataList)],
   );
